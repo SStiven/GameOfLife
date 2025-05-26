@@ -10,13 +10,36 @@ namespace GameOfLife
     class AdWindow : Window
     {
         private readonly DispatcherTimer adTimer;
-        private int imgNmb;     // the number of the image currently shown
-        private string link;    // the URL where the currently shown ad leads to
+        private int imageIndexCurrentlyShown;
+        private static Random rnd = new Random();
         
-    
+        private string[] adUrls = new[]
+        {
+            "http://example.com/ad1",
+            "http://example.com/ad2",
+            "http://example.com/ad3"
+        };
+
+        private string[] imagePaths = new[]
+        {
+            "ad1.jpg",
+            "ad2.jpg",
+            "ad3.jpg"
+        };
+
+        private string adUrl;
+        private readonly BitmapImage[] adBitmapImages;
+        private readonly ImageBrush adBrush = new ImageBrush();
+
+
         public AdWindow(Window owner)
         {
-            Random rnd = new Random();
+            adBitmapImages = new BitmapImage[imagePaths.Length];
+            for (int i = 0; i < imagePaths.Length; i++)
+            {
+                adBitmapImages[i] = LoadBitmap(imagePaths[i]);
+            }
+
             Owner = owner;
             Width = 350;
             Height = 100;
@@ -26,64 +49,58 @@ namespace GameOfLife
             Cursor = Cursors.Hand;
             ShowActivated = false;
             MouseDown += OnClick;
-            
-            imgNmb = rnd.Next(1, 3);
+
+            imageIndexCurrentlyShown = rnd.Next(0, adBitmapImages.Length);
             ChangeAds(this, new EventArgs());
 
-            // Run the timer that changes the ad's image 
-            adTimer = new DispatcherTimer();
-            adTimer.Interval = TimeSpan.FromSeconds(3);
-            adTimer.Tick += ChangeAds;
-            adTimer.Start();
+            adTimer = InitializeAdTimer();
+        }
+
+        private DispatcherTimer InitializeAdTimer()
+        {
+            var timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(3);
+            timer.Tick += ChangeAds;
+            timer.Start();
+
+            return timer;
         }
 
         private void OnClick(object sender, MouseButtonEventArgs e)
         {
-            System.Diagnostics.Process.Start(link);
+            System.Diagnostics.Process.Start(adUrl);
             Close();
         }
-        
+
         protected override void OnClosed(EventArgs e)
         {
-            //Unsubscribe();
+            adTimer.Stop();
+            Unsubscribe();
             base.OnClosed(e);
-        } 
+        }
 
         public void Unsubscribe()
         {
             adTimer.Tick -= ChangeAds;
         }
 
+        private BitmapImage LoadBitmap(string path)
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(path, UriKind.Relative);
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            return bmp;
+        }
+
         private void ChangeAds(object sender, EventArgs eventArgs)
         {
-            
-            ImageBrush myBrush = new ImageBrush();
-            
-            switch (imgNmb)
-            {
-                case 1:
-                    myBrush.ImageSource =
-                        new BitmapImage(new Uri("ad1.jpg", UriKind.Relative));
-                    Background = myBrush;
-                    link = "http://example.com";
-                    imgNmb++;
-                    break;
-                case 2:
-                    myBrush.ImageSource =
-                        new BitmapImage(new Uri("ad2.jpg", UriKind.Relative));
-                    Background = myBrush;
-                    link = "http://example.com";
-                    imgNmb++;
-                    break;
-                case 3:
-                    myBrush.ImageSource =
-                        new BitmapImage(new Uri("ad3.jpg", UriKind.Relative));
-                    Background = myBrush;
-                    link = "http://example.com";
-                    imgNmb = 1;
-                    break;
-            }
-            
+
+            imageIndexCurrentlyShown = (imageIndexCurrentlyShown + 1) % adBitmapImages.Length;
+            adBrush.ImageSource = adBitmapImages[imageIndexCurrentlyShown];
+            Background = adBrush;
+            adUrl = adUrls[imageIndexCurrentlyShown];
         }
     }
 }

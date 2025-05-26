@@ -82,6 +82,105 @@ We reduced memory allocation, as shown in the following screenshot
 
 ![alt text](memory-profiles-remove-creation.png)
 
+
+We also have in the class MainWindow, that the AdWindow array is created each time StartAdd is called, is better to reuse them and remove some magic numbers like '2' from the original code:
+
+```cs
+        private void StartAd()
+        {
+            adWindow = new AdWindow[2];
+            for (int i = 0; i < 2; i++)
+            {
+                if (adWindow[i] == null)
+                {
+                    adWindow[i] = new AdWindow(this);
+                    adWindow[i].Closed += AdWindowOnClosed;
+                    adWindow[i].Top = this.Top + (330 * i) + 70;
+                    adWindow[i].Left = this.Left + 240;
+                    adWindow[i].Show();
+                }
+            }
+        }
+```
+
+I also noticed in MainWindow that the AdWindow array is re-created every time StartAd is called—and it hard-codes the number 2. It’s cleaner to reuse a fixed array and remove those magic numbers:
+
+```cs
+        public AdWindow(Window owner)
+        {
+            Random rnd = new Random();
+            Owner = owner;
+            Width = 350;
+            Height = 100;
+            ResizeMode = ResizeMode.NoResize;
+            WindowStyle = WindowStyle.ToolWindow;
+            Title = "Support us by clicking the ads";
+            Cursor = Cursors.Hand;
+            ShowActivated = false;
+            MouseDown += OnClick;
+            
+            imageNumberCurrentlyShown = rnd.Next(1, 3);
+            ChangeAds(this, new EventArgs());
+
+            // Run the timer that changes the ad's image 
+            adTimer = new DispatcherTimer();
+            adTimer.Interval = TimeSpan.FromSeconds(3);
+            adTimer.Tick += ChangeAds;
+            adTimer.Start();
+        }
+```
+
+In AdWindow, the timer was never stopped or unsubscribed when the window closed, causing a leak, and I also fixed it by overriding OnClosed:
+
+```cs
+        protected override void OnClosed(EventArgs e)
+        {
+            adTimer.Stop();
+            Unsubscribe();
+            base.OnClosed(e);
+        }
+
+        public void Unsubscribe()
+        {
+            adTimer.Tick -= ChangeAds;
+        }
+```
+
+I also discovered that a new BitmapImage was created on every tick—hitting the disk repeatedly and leaking memory. To solve this, we preload each image once in the constructor:
+
+
+```cs
+public AdWindow(Window owner)
+{
+    adBitmapImages = new BitmapImage[imagePaths.Length];
+    for (int i = 0; i < imagePaths.Length; i++)
+    {
+        adBitmapImages[i] = LoadBitmap(imagePaths[i]);
+    }
+
+    Owner = owner;
+    Width = 350;
+    Height = 100;
+    ResizeMode = ResizeMode.NoResize;
+    WindowStyle = WindowStyle.ToolWindow;
+    Title = "Support us by clicking the ads";
+    Cursor = Cursors.Hand;
+    ShowActivated = false;
+    MouseDown += OnClick;
+
+    imageIndexCurrentlyShown = rnd.Next(0, adBitmapImages.Length);
+    ChangeAds(this, new EventArgs());
+
+    adTimer = InitializeAdTimer();
+}
+```
+
+We had been allocating a brand-new ImageBrush on every ad swap. Now we create a single ImageBrush up front and reuse it; similarly, each BitmapImage is loaded exactly once, so each 3-second tick only swaps indexes instead of re-reading files or instantiating objects.
+
+As an extra improvement, I could introduce a persistence layer or caching service dedicated to loading and managing ad images, separating those concerns from the window itself.
+
+## ToDos
+
 After refactoring the Grid and Cell classes, I have a few concerns:
 
 - The Grid class has too many responsibilities, perhaps splitting its functionality into separate classes would be beneficial.
@@ -89,5 +188,7 @@ After refactoring the Grid and Cell classes, I have a few concerns:
 - Generation updates still run on the UI thread, we should move them off the UI thread once the application is in a more stable state.
 
 - It might make sense to encapsulate the logic that decides whether a cell should revive, die, or age within the Cell class itself.
+
+- Introduce a persistence layer for async image loading 
 
 - We may not need two separate grids (one for current cells and one for the next generation), but I’m not sure.
