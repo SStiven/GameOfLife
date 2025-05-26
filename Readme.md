@@ -177,7 +177,43 @@ public AdWindow(Window owner)
 
 We had been allocating a brand-new ImageBrush on every ad swap. Now we create a single ImageBrush up front and reuse it; similarly, each BitmapImage is loaded exactly once, so each 3-second tick only swaps indexes instead of re-reading files or instantiating objects.
 
-As an extra improvement, I could introduce a persistence layer or caching service dedicated to loading and managing ad images, separating those concerns from the window itself.
+As an extra improvement, I could introduce a persistence layer or caching service dedicated to loading and managing ad 
+images, separating those concerns from the window itself.
+
+## Come back to MainWindow class
+
+In the constructor of the MainWindow class we a time subscription that is not unsubcribed
+
+```cs
+        public MainWindow()
+        {
+            InitializeComponent();
+            mainGrid = new Grid(MainCanvas);
+
+            generationTimer = new DispatcherTimer();
+            generationTimer.Tick += OnTimer;
+            generationTimer.Interval = TimeSpan.FromMilliseconds(200);
+        }
+```
+
+The original code doesn't stop or deatach OnTimer, so generationTimer maintains a reference to MainWindows, in this way it is never garbage-collecter if is closed. For this reason, I overrided the OnClosed method
+
+```cs
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+
+            if (generationTimer != null)
+            {
+                generationTimer.Stop();
+                generationTimer.Tick -= OnTimer;
+                generationTimer = null;
+            }
+        }
+```
+
+
+
 
 ## ToDos
 

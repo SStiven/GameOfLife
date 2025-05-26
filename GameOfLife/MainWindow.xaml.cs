@@ -26,25 +26,41 @@ namespace GameOfLife
         {
             for (int i = 0; i < adWindows.Length; i++)
             {
-                if (adWindows[i] is null || !adWindows[i].IsLoaded)
+                var window = adWindows[i];
+                if (window is null || !window.IsLoaded)
                 {
-                    adWindows[i] = new AdWindow(this);
-                    adWindows[i].Closed += AdWindowOnClosed;
-                    adWindows[i].Top = this.Top + (330 * i) + 70;
-                    adWindows[i].Left = this.Left + 240;
-                    adWindows[i].Show();
+
+                    if (!(window is null))
+                    {
+                        window.Closed -= AdWindowOnClosed;
+                        window.Close();
+                    }
+
+                    window = new AdWindow(this);
+                    window.Closed += AdWindowOnClosed;
+                    window.Top = this.Top + (330 * i) + 70;
+                    window.Left = this.Left + 240;
+                    window.Show();
+
+                    adWindows[i] = window;
                 }
             }
         }
 
         private void AdWindowOnClosed(object sender, EventArgs eventArgs)
         {
-            for (int i = 0; i < adWindows.Length; i++)
+            var closedWindow = sender as AdWindow;
+            if (closedWindow == null) return;
+
+            closedWindow.Closed -= AdWindowOnClosed;
+
+            int index = Array.IndexOf(adWindows, closedWindow);
+            if (index >= 0)
             {
-                adWindows[i].Closed -= AdWindowOnClosed;
-                adWindows[i] = null;
+                adWindows[index] = null;
             }
         }
+
 
         private void Button_OnClick(object sender, EventArgs e)
         {
@@ -71,6 +87,18 @@ namespace GameOfLife
         private void ButtonClear_Click(object sender, RoutedEventArgs e)
         {
             mainGrid.Clear();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+
+            if (generationTimer != null)
+            {
+                generationTimer.Stop();
+                generationTimer.Tick -= OnTimer;
+                generationTimer = null;
+            }
         }
     }
 }
