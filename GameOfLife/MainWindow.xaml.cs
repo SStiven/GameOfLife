@@ -1,12 +1,16 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 
 namespace GameOfLife
 {
     public partial class MainWindow : Window
     {
-        private Grid mainGrid;
+        private const int cellSize = 5;
+        private Grid grid;
+        private readonly GridRenderer gridRenderer;
         DispatcherTimer generationTimer;
         private int genCounter;
         private const int maxNumAdWindows = 2;
@@ -15,7 +19,14 @@ namespace GameOfLife
         public MainWindow()
         {
             InitializeComponent();
-            mainGrid = new Grid(MainCanvas);
+
+            int width = (int)(MainCanvas.Width / cellSize);
+            int height = (int)(MainCanvas.Height / cellSize);
+
+            grid = new Grid(width, height);
+            gridRenderer = new GridRenderer(MainCanvas, grid, cellSize);
+
+            gridRenderer.Update();
 
             generationTimer = new DispatcherTimer();
             generationTimer.Tick += OnTimer;
@@ -79,14 +90,21 @@ namespace GameOfLife
 
         private void OnTimer(object sender, EventArgs e)
         {
-            mainGrid.Update();
+            grid.Update();
+            gridRenderer.Update();
             genCounter++;
             lblGenCount.Content = "Generations: " + genCounter;
         }
 
         private void ButtonClear_Click(object sender, RoutedEventArgs e)
         {
-            mainGrid.Clear();
+            grid.Clear();
+            RepaintCanvas(grid);
+        }
+
+        private void RepaintCanvas(Grid grid)
+        {
+            gridRenderer.Update();
         }
 
         protected override void OnClosed(EventArgs e)

@@ -175,14 +175,13 @@ public AdWindow(Window owner)
 }
 ```
 
-We had been allocating a brand-new ImageBrush on every ad swap. Now we create a single ImageBrush up front and reuse it; similarly, each BitmapImage is loaded exactly once, so each 3-second tick only swaps indexes instead of re-reading files or instantiating objects.
+We had been allocating a brand-new ImageBrush on every ad swap. Now we create a single ImageBrush up front and reuse it; likewise, each BitmapImage is loaded exactly once, so each 3-second tick only swaps indexes instead of re-reading files or instantiating objects.
 
-As an extra improvement, I could introduce a persistence layer or caching service dedicated to loading and managing ad 
-images, separating those concerns from the window itself.
+As an extra improvement, we could introduce a persistence layer or caching service dedicated to loading and managing ad images, thereby separating those concerns from the window itself.
 
 ## Come back to MainWindow class
 
-In the constructor of the MainWindow class we a time subscription that is not unsubcribed
+In the constructor of MainWindow, we subscribe to the timer but never unsubscribe:
 
 ```cs
         public MainWindow()
@@ -196,7 +195,7 @@ In the constructor of the MainWindow class we a time subscription that is not un
         }
 ```
 
-The original code doesn't stop or deatach OnTimer, so generationTimer maintains a reference to MainWindows, in this way it is never garbage-collecter if is closed. For this reason, I overrided the OnClosed method
+Because the original code never stops or detaches OnTimer, generationTimer holds a reference to the MainWindow. As a result, the window is never garbage-collected when closed. To fix this, I overrode OnClosed:
 
 ```cs
         protected override void OnClosed(EventArgs e)
@@ -212,16 +211,58 @@ The original code doesn't stop or deatach OnTimer, so generationTimer maintains 
         }
 ```
 
+The original StartAd method creates new AdWindow instances on every call—even if an existing window could be reused
 
+```cs
+        private void StartAd()
+        {
+            for (int i = 0; i < adWindows.Length; i++)
+            {
+                if (adWindows[i] is null || !adWindows[i].IsLoaded)
+                {
+                    adWindows[i] = new AdWindow(this);
+                    adWindows[i].Closed += AdWindowOnClosed;
+                    adWindows[i].Top = this.Top + (330 * i) + 70;
+                    adWindows[i].Left = this.Left + 240;
+                    adWindows[i].Show();
+                }
+            }
+        }
+```
+
+By reusing inactive windows instead of instantiating new ones, we can reduce overhead and improve performance.
+
+In the original Clear method, cells were recreated instead of simply being marked dead:
+
+```cs
+        public void Clear()
+        {
+            for (int i = 0; i < SizeX; i++)
+                for (int j = 0; j < SizeY; j++)
+                {
+                    cells[i, j] = new Cell(i, j, 0, false);
+                    nextGenerationCells[i, j] = new Cell(i, j, 0, false);
+                    cellsVisuals[i, j].Fill = Brushes.Gray;
+                }
+        }
+```
+
+Rather than instantiating new Cell objects, we should update the existing ones to avoid unnecessary allocations and potential leaks.
+
+
+### Offloading heavy work from the UI thread
+A bigger issue is that we’re counting neighbors on the UI thread while rendering at the same time. To address this, first we should split responsibilities:
+
+Grid – remains responsible solely for simulating the Game of Life.
+
+GridRendered – handles all rendering and UI interactions.
+
+This respects the Single Responsibility Principle and lets us perform simulations on a background thread if needed.
 
 
 ## ToDos
 
-After refactoring the Grid and Cell classes, I have a few concerns:
-
-- The Grid class has too many responsibilities, perhaps splitting its functionality into separate classes would be beneficial.
-
-- Generation updates still run on the UI thread, we should move them off the UI thread once the application is in a more stable state.
+- As we separated the Grid Rendering from the logic, now it should be easier to handle the generation updates on a different thread.
 
 - It might make sense to encapsulate the logic that decides whether a cell should revive, die, or age within the Cell class itself.
 

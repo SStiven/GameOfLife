@@ -1,6 +1,6 @@
 ﻿namespace GameOfLife
 {
-    class Cell
+    internal class Cell
     {
         public int PositionX { get; }
         public int PositionY { get; }
@@ -9,8 +9,8 @@
 
         public Cell(int row, int column, int age, bool isAlive)
         {
-            PositionX = row * 5;
-            PositionY = column * 5;
+            PositionX = row;
+            PositionY = column;
             Age = age;
             IsAlive = isAlive;
         }
