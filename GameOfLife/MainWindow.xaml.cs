@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Threading;
 
 namespace GameOfLife
@@ -15,6 +14,7 @@ namespace GameOfLife
         private int genCounter;
         private const int maxNumAdWindows = 2;
         private readonly AdWindow[] adWindows = new AdWindow[maxNumAdWindows];
+        private const int intervalInMilliseconds = 200;
 
         public MainWindow()
         {
@@ -28,9 +28,12 @@ namespace GameOfLife
 
             gridRenderer.Update();
 
-            generationTimer = new DispatcherTimer();
+            generationTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(intervalInMilliseconds),
+            };
             generationTimer.Tick += OnTimer;
-            generationTimer.Interval = TimeSpan.FromMilliseconds(200);
+
         }
 
         private void StartAd()
@@ -90,20 +93,30 @@ namespace GameOfLife
 
         private void OnTimer(object sender, EventArgs e)
         {
-            grid.Update();
-            gridRenderer.Update();
-            genCounter++;
-            lblGenCount.Content = "Generations: " + genCounter;
+            generationTimer.Stop();
+
+            _ = HandleTickAsync();
+        }
+
+        private async Task HandleTickAsync()
+        {
+            try
+            {
+                await Task.Run(() => grid.Update());
+
+                gridRenderer.Update();
+                genCounter++;
+                lblGenCount.Content = $"Generations: {genCounter}";
+            }
+            finally
+            {
+                generationTimer.Start();
+            }
         }
 
         private void ButtonClear_Click(object sender, RoutedEventArgs e)
         {
             grid.Clear();
-            RepaintCanvas(grid);
-        }
-
-        private void RepaintCanvas(Grid grid)
-        {
             gridRenderer.Update();
         }
 

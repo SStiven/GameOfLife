@@ -259,13 +259,14 @@ GridRendered – handles all rendering and UI interactions.
 
 This respects the Single Responsibility Principle and lets us perform simulations on a background thread if needed.
 
+### Grid.Update now runs in a different thread
 
 ## ToDos
-
-- As we separated the Grid Rendering from the logic, now it should be easier to handle the generation updates on a different thread.
 
 - It might make sense to encapsulate the logic that decides whether a cell should revive, die, or age within the Cell class itself.
 
 - Introduce a persistence layer for async image loading 
 
-- We may not need two separate grids (one for current cells and one for the next generation), but I’m not sure.
+- We may not need two separate grids (one for current cells and one for the next generation), but I’m not sure about it.
+
+- We’re applying colors to every ellipse, even when its color hasn’t changed
